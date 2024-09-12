@@ -31,7 +31,7 @@ The board contains no less than 4 micro-processors:
 
 Each micro-processor has its own address and data bus. This is a rough block diagram of the Main CPU busses that I drew:
 
-**diagram**
+![block diagram](bubble-bobble-block.png)
 
 I really struggle reading other people's block diagrams, so if this does not make any sense to you, do not fret, it is not that important.
 
