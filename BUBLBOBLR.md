@@ -31,7 +31,9 @@ The board contains no less than 4 micro-processors:
 
 Each micro-processor has its own address and data bus. This is a rough block diagram of the Main CPU busses that I drew:
 
-![block diagram](bubble-bobble-block.png)
+<p align=center>
+<img src="bubble-bobble-block.png" width=50% height=50%>
+</p>
 
 I really struggle reading other people's block diagrams, so if this does not make any sense to you, do not fret, it is not that important.
 
@@ -82,6 +84,11 @@ The 60-pin board connector is functional but broken, so I eventually decide to r
 At this point I am feeling a little stuck, everything that I probed seems to work correctly, the logic chips seem to be doing what they are supposed to do, all the traces beep, _why is this thing not working?_
 
 I get out my 16 channels logic analyzer and record a trace of the main CPU address bus using a DIP clip. I don't have enough channels to know _what_ the CPU is doing, but the addresses can give me a clue of what's going on. I also record a trace of the good board.
+
+<p float="left" align="center">
+<img src="IMG_2286.jpeg" width=30% height=30%>
+<img src="IMG_2285.jpeg" width=30% height=30%>
+</p>
 
 There's lots of random noise in the trace, looking closely I notice that the noise seems to mostly be at the sampling frequency so I write a little script to discard any sample of 1/50MHz width (the sampling frequency), and then compare the good and the bad traces. _I'll still have noise, but it will be better_ I say to myself.
 
@@ -224,13 +231,20 @@ I check the pin `CD7` with my oscilloscope and sure enough, it's always high on 
 
 I know the RAM chip itself is good, as I swapped it earlier so I look at all the other chips that might be feeding this line. IC8 seems like a great candidate, it has an output line on `CD7`, looks very corroded. Unfortunately there's a resistor package too close to the chip to use my logic comparator, so the only option is to desolder it and check it out of circuit.
 
+<p align=center>
+<img src="IMG_2281c.jpeg" width=50% height=50%>
+</p>
+
 I remove it, add a socket and immediately go to my bench. If IC8 was driving the line high, it should at least do something different now, even without a chip in the socket. _And it does_. The board does not reset anymore, just a black screen. At this point I've been working on this board for weeks during nights and weekends. This is the first tangible improvement I had the entire time.
 
-I find a new 74LS253 for IC8, put it in the socket and lo and behold.
 
-**video**
+I find a new 74LS253 for IC8, put it in the socket and lo and behold, it works!
 
 All in all, I replaced and socketed around 10 chips, patched lots of traces and replaced the R connector. Turns out IC8 was the only bad IC. I am happy to report the BK550 is able to tell me that the 74LS253 had a stuck line.
+
+<p align=center>
+<img src="IMG_2284.jpeg" width=30% height=30%>
+</p>
 
 Next up, the Video board.
 
