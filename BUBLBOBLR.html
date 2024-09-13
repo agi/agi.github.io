@@ -1,18 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body {
+    padding-left: 10%;
+    padding-right: 10%;
+    padding-top: 3em;
+    max-width: 40em;
+}
+code {
+    background: #EEE;
+}
+.multiline {
+    padding-left: 1em;
+    padding-right: 1em;
+    padding-bottom: 1em;
+    display: block;
+    white-space: pre-wrap;
+    margin-bottom: 1em;
+    margin-top: 1em;
+}
+</style>
+</head>
+<body>
 <h1> A Bubble Bobble repair journey </h1>
+<i> Agi Sferro &lt;agi@sferro.dev></i><br>
+<i> Sept 12th 2024</i><br>
+<br>
 
-A couple of months ago I picked up a "for parts", original Bubble Bobble board. I've repaired Gameboy carts before and I thought this was gonna be a fun project. <br><br>
+A couple of months ago I picked up a "for parts", original Bubble Bobble board. I have repaired Gameboy carts before and I thought this was gonna be a fun project. <br><br>
 
-Going in, I had no prior knowledge of arcade boards, 80s eletronics, TTL, discrete logic or anything like that. I read a lot of Bubble bobble repair logs and they really helped me so I figured I would write my own. <br><br>
+Going in, I had no prior knowledge of arcade boards, 80s electronics, TTL, discrete logic or anything like that. I read a lot of Bubble Bobble repair logs and they really helped me so I figured I would write my own. <br><br>
 
-Buckle up, this is gonna be a doozy. <br><br>
+Buckle up, this is gonna be a doozy.
 
 <h2> Background </h2>
 
-If you're familiar with Bubble Bobble or arcade boards or electronics in general you can safely skip this section. <br><br>
+If you are familiar with Bubble Bobble or arcade boards or electronics in general you can safely skip this section. <br><br>
 
-Bubble Bobble, like many older Arcade boards, has schematic fully available online, so I am going to assume that you can refer to it when needed. Chips on this board are denominated by ICXX so that is what I will use throughout this doc.<br><br>
+Bubble Bobble, like many older Arcade boards, has schematics fully available online, so I am going to assume that you can refer to them when needed. Chips on this board are denominated by ICxx and that is what I will use throughout this.<br><br>
 
-Like many boards of the time, the board is built using a lot of discrete logic, in the form of Texas Instrument 74LS00 series chips. These chips are usually very simple, e.g. 2 or 3 OR gate, or a simple multiplexer or flip-flops. Thanks to this, a lot of the logic is openly accessible on the board, you can literally probe the CPU Address buss with a logic analyzer and see every single read or write. This will be very helpful later.<br><br>
+Like many boards of the time, Bubble Bobble is built using a lot of discrete logic, in the form of <a href="https://en.wikipedia.org/wiki/7400-series_integrated_circuits">Texas Instrument 7400</a> series chips. These chips are usually very simple, e.g. 2 or 3 OR gates, or a simple multiplexer or flip-flops. Thanks to this, a lot of the logic is openly accessible on the board, you can literally probe the CPU Address bus with a logic analyzer and see every single read or write. This will be very helpful later.<br><br>
 
 The board contains no less than 4 micro-processors:
 <ul>
@@ -28,86 +56,94 @@ The board contains no less than 4 micro-processors:
 	<li> Sound RAM at IC47
 	<li> Sound ROM at IC46
 </ul>
-<li> IC17, "security chip" custom MCU a.k.a PS4, running at 6Mhz. We now know this is a custom Motorola 6801U4. <ul>
+<li> IC17, "security chip" custom MCU a.k.a PS4, running at 6Mhz. We <a href="https://mamelife.blogspot.com/2006/08/good-news.html">now know</a> this is a <a href="https://mamelife.blogspot.com/2006/08/completed-at-last.html">custom Motorola 6801U4</a>. <ul>
     <li> MCU Ram (or MCRAM) at IC16, accessible to Main CPU
     <li> Internal ROM, inaccessible without decapping (hence the "security" part)
 </ul>
 </ul>
 
-Each micro-processor has its own address and data bus. This is a rough block diagram of the Main CPU busses that I drew: <br><br>
+Each micro-processor has its own address and data bus. This is a rough block diagram of the Main CPU buses: <br><br>
 
 <p align=center>
-<img src="/bubble-bobble-block.png" width=50% height=50%>
+<img src="./bubble-bobble-block.png" width=70%>
 </p>
 
-I really struggle reading other people's block diagrams, so if this does not make any sense to you, do not fret, it is not that important.<br><br>
+I really struggle reading other people's block diagrams, so if this does not make any sense to you, do not fret, it is not that important.
 
-<h3> Busses </h3>
+<h3> Buses </h3>
 
-In basic terms, a bus needs to connect a CPU with multiple chips on the board. The 16-bit address bus of the main CPU is made up of 16 individual traces, each carrying address information for the corresponding bit. Similarly, the 8-bit data bus carries the data information coming in and out of the CPU.<br><br>
+In basic terms, a bus needs to connect a CPU with multiple chips on the board. The 16-bit address bus of the main CPU is made up of 16 individual lines, each carrying address information for the corresponding bit. Similarly, the 8-bit data bus carries the data information coming in and out of the CPU.<br><br>
 
-If the CPU wants to read at address <code>0xFF00</code> it will set it's address pins <code>A15..A8</code> to "high" and the address pins <code>A7..A0</code> to "low". The corresponding chip will set the data bus pins <code>D7..D0</code> to the value requested. Which chip corresponds to which address (often called "memory map") is encoded _in hardware_, mostly driven by the PAL chips.<br><br>
+For instance, if the CPU wants to read at address <code>0xFF00</code>, it will set it's address pins <code>A15..A8</code> to "high" and the address pins <code>A7..A0</code> to "low". The corresponding chip will set the data bus pins <code>D7..D0</code> to the value requested. Which chip corresponds to which address (often called "memory map") is encoded <i>in hardware</i>, mostly driven by the PAL chips.<br><br>
 
-The Main CPU the data/address buses connect to: the Main ROM, the sub ROM, the Work RAM, the MCU Ram, the Watchdog (more on this later), and others. To make sure that only one chip drives the data pins at one time, there are multiple strategies involved:
+The Main CPU data/address buses connect to: the Main ROM, the sub ROM, the Work RAM, the MCU Ram, the Watchdog (more on this later), and others. To make sure that only one chip drives the data pins at every one time, there are multiple strategies involved:
 <ul>
 <li> The OE (Output Enable) or CS (Chip Select) pins of unrelated chips are disabled
-<li> A multiplexer (a simple logic chip that can switch between two or more inputs into a single output) is put in between the bus and the chip
+<li> A <a href="https://en.wikipedia.org/wiki/Multiplexer">multiplexer</a> is put in between the bus and the chip
 </ul>
 
-Additionally, older chips, like the 74LS series, require a lot of current to drive the state high or low. To make sure that each line is driven adequately, buffers (simple logic chips that isolate the input from the output load) are often put in between the bus and multiple outputs. Occasionally a double-NOT gate is used in place of a buffer, e.g. the 6MHz clock goes through two NOT gates at IC35 before feeding into the main CPU.<br><br>
+Additionally, older chips like the 74LS series employed on this board, require a lot of current to drive the state high or low. To make sure that each line is driven adequately, <a href="https://en.wikipedia.org/wiki/Buffer_amplifier">buffers</a> are often put in between the bus and multiple outputs. Occasionally a double-<code>NOT</code> gate is used in place of a buffer, e.g. the 6MHz clock goes through two <code>NOT</code> gates at IC35 before feeding into the main CPU.<br><br>
 
-With all of this in mind, a lot of the board is essentially codifying the memory map of each CPU into hardware. Each bus will go through a buffer first, then one or more multiplexer to connect to all the required chips, the enable pins will be driven by the PAL chips and finally connect to the RAM, ROM or hardware input.<br><br>
+<p align=center>
+<img src="./double-not-schematich.png" width=30%>
+</p>
+
+With all of this in mind, a lot of the board is essentially codifying the memory map of each CPU into hardware. Each bus will go through a buffer first, then one or more multiplexer to connect to all the required chips, the enable pins will be driven by the PAL chips and finally connect to the RAM, ROM or hardware input.
 
 <h3> Watchdog </h3>
 
-A hardware watchdog is a system that ensures that the system continues to operate normally. At its basic terms, a watchdog is a timer, which, if not restarted, will reset the system. The CPU is in charge of periodically restarting the watchdog. If the system does not restart, we are guaranteed that the CPU is still running somewhat normally.<br><br>
+A <a href="https://en.wikipedia.org/wiki/Watchdog_timer">hardware watchdog</a> is a system that ensures that the system continues to operate normally. At its basic terms, a watchdog is a timer, which, if not restarted, will reset the system. The CPU is in charge of periodically restarting the watchdog. If the system does not reset, we are guaranteed that the CPU is still running somewhat normally.<br><br>
 
-The Bubble bobble watchdog is implemented by a 74LS393 counter at IC31. The counter increments at every VBLANK (Vertical Blank, a signal that is pulled low whenever a new frame is drawn). The CPU can restart the Watchdog timer by writing to address <code>0xFF80</code>. This address is encoded into the PAL at IC49 which pulls the <code>TRES</code> (Timer RESet?) line through the multiplexer at IC39. If IC31 timer is not restarted, the <code>1DQ</code> line of IC31 will be eventually pulled high, triggering the master <code>RESET</code> line which restarts every chip on the board including the main CPU.<br><br>
+The Bubble Bobble watchdog is implemented by a 74LS393 counter at IC31. The counter increments at every <a href="https://en.wikipedia.org/wiki/Vertical_blanking_interval">VBLANK</a>. The CPU can restart the Watchdog timer by writing to address <code>0xFF80</code>. This address is encoded into the PAL at IC49 which pulls the <code>TRES</code> (Timer RESet) line through the multiplexer at IC39. If IC31 timer is not restarted, the <code>1DQ</code> line of IC31 will be eventually pulled high, triggering the master <code>RESET</code> line which restarts every chip on the board including the main CPU.
 
 <h3> Repair log </h3>
 
-When I first got the board I immediately realized that I was in for a long journey. The board had extensive corrosion, lots of deep scratches and what looked like corroded traces.<br><br>
+When I first get the board, I immediately realize that I am in for a long journey. The board has extensive corrosion, lots of deep scratches and what looks like corroded traces.<br><br>
 
 I start by dumping out all the ROMs and check against the MAME database. Everything checks out so I move on.<br><br>
 
-Powering up the board I noticed the 5V line was really low, around 3.5V, no matter how much I cranked up the power supply. <br><br>
+Powering up the board I notice the 5V line is really low, around 3.5V, no matter how much I crank up the power supply. <br><br>
 
-The first thing I did was to replace the H connector, which powers the board. This is probably unnecessary as you can just file the corrosion away from the pins, but this board was gonna be my Frankenstein / sandbox board anyway, so I did not care too much about keeping it stock. This brought the voltage to 4.1~4.2V.<br><br>
+The first thing I do is to replace the H connector, which powers the board. This is probably unnecessary as you can just file the corrosion away from the pins, but this board is going to be my Frankenstein / sandbox board anyway, so I do not care too much about keeping it stock. This brings the voltage to 4.1~4.2V.<br><br>
 
-Using a known-good Bubble bobble arcade board I verified that both the CPU board and the Video board are both bad. For this log I'm going to focus on the CPU board, which I connected to a known-good Video board.<br><br>
+Using a known-good Bubble Bobble arcade board I verify that both the CPU board and the Video board are both bad. For this log I am going to focus on the CPU board, which I connected to a known-good Video board.<br><br>
 
 The CPU board keeps resetting, the watchdog barks. The Sub CPU never gets out of reset, so I know there's some problems surrounding the Main CPU.<br><br>
 
-With an oscilloscope, I probe the TRES line of the watchdog, it fires once and then stops. <br><br>
+With an oscilloscope, I probe the TRES line of the watchdog, it fires once and then stops firing. <br><br>
 
-With my multimeter in continuity mode I painstakenly probe every bus trace coming out of the CPU to the RAM/ROMs. I patch ~10 broken traces that I find, I start feeling an intense internal dread, _I will never find all the broken traces on this board_.<br><br>
+With my multimeter in continuity mode I painstakingly probe every bus trace coming out of the CPU to the RAM/ROMs. I patch ~10 broken traces that I find, I start feeling an intense internal dread, <i>I will never find all the broken traces on this board</i>.
 
-After patching the traces, board still resets. I pull out my BK Precision 550 Logic comparator and start checking ICs around the busses but everything tests as good. I just got the 550 so I'm not sure if the readings are correct, there are also chips too close to each other that I cannot probe.<br><br>
-
-I start replacing some of the 74LS245, 157, 138 around the busses, but nothing seems to change. Replace RAMs and CPUs, nothing.<br><br>
-
-The 60-pin board connector is functional but broken, so I eventually decide to replace it for the heck of it. This seems to make the reset intervals longer (!) something is changing.<br><br>
-
-At this point I am feeling a little stuck, everything that I probed seems to work correctly, the logic chips seem to be doing what they are supposed to do, all the traces beep, _why is this thing not working?_<br><br>
-
-I get out my 16 channels logic analyzer and record a trace of the main CPU address bus using a DIP clip. I don't have enough channels to know _what_ the CPU is doing, but the addresses can give me a clue of what's going on. I also record a trace of the good board.<br><br>
-
-<p float="left" align="center">
-<img src="/IMG_2286.jpeg" width=30% height=30%>
-<img src="/IMG_2285.jpeg" width=30% height=30%>
+<p align=center>
+<img src="./IMG_2283.jpeg" width=60%>
 </p>
 
-There's lots of random noise in the trace, looking closely I notice that the noise seems to mostly be at the sampling frequency so I write a little script to discard any sample of 1/50MHz width (the sampling frequency), and then compare the good and the bad traces. _I'll still have noise, but it will be better_ I say to myself.<br><br>
+After patching the traces, the board still resets. I pull out my BK Precision 550 Logic comparator and start checking ICs around the buses but everything tests as good. I just got the 550 so I am not sure if the readings are correct or if I am doing something wrong, there are also chips too close to each other that I cannot probe.<br><br>
 
-Lo and behold, _all the noise_ is gone. The good and bad traces agree for 300k samples and then deviates sharply. This gives me great confidence that the deviation points at the problem.<br><br>
+I start replacing some of the 74LS245, 157, 138 around the buses, but nothing seems to change. Replace RAMs and CPUs, nothing.<br><br>
 
-It then hits me: I can just disassemble the ROMs and see what the CPU is doing!<br><br>
+The 60-pin board connector is functional but one of the flaps is broken, so I eventually decide to replace it for the heck of it. This seems to make the reset intervals longer (!) <i>yahoo, something is changing</i>.<br><br>
 
-Looking for a disassembler people online reccomends NSA's Ghidra, which I know of as a powerful reverse-engineering tool. I never bothered using it as I though it would be really hard to learn, but to my surprise, I was able to get working in minutes! The UI feels very intuitive and for basic things it's really nice, and of course, it supports the Z80!<br><br>
+At this point I am feeling a little stuck, everything that I probed seems to work correctly, the logic chips seem to be doing what they are supposed to do, all the traces beep, <i>why is this thing not working?</i><br><br>
 
-I have some 8-bit assembler knowledge from my time writing a Gameboy emulator. Here's a snippet the diff of the two traces, keep in mind, the column is the _address_ that the CPU is reading or writing to
+I get out my 16 channels logic analyzer and record a trace of the main CPU address bus using a DIP clip. I don't have enough channels to know <i>what</i> the CPU is doing, but the addresses can give me a clue of what's going on. I also record a trace of the good board. <i> I might or might not have a 100 channel logic analyzer coming in the mail</i><br><br>
 
-<code style="display:block; white-space:pre-wrap">
+<p float="left" align="center">
+<img src="/IMG_2286.jpeg" width=30%>
+<img src="/IMG_2285.jpeg" width=30%>
+</p>
+
+There is a lot of random noise in the logic analyzer trace, looking closely I notice that the noise seems to mostly be at the sampling frequency so I write a little script to discard any sample of 1/50MHz width, and then compare the good and the bad traces. <i>I'll still have noise, but it will be better</i> I say to myself.<br><br>
+
+Lo and behold, <i>all the noise</i> is gone. The good and bad traces agree for 300k samples and then deviate sharply. This gives me great confidence that the deviation point is the problem.<br><br>
+
+It then hits me: <i>I can just disassemble the ROMs and see what the CPU is doing!</i><br><br>
+
+Looking for a disassembler, people online recommend NSA's Ghidra, which I know of as a powerful reverse-engineering tool. I never bothered using it as I thought it would be really hard to learn, but to my surprise, I was able to get working in minutes! The UI feels very intuitive and for basic things it's really nice, and of course, it supports the Z80!<br><br>
+
+I have some 8-bit assembler knowledge from my time writing a Gameboy emulator. Here's a snippet of the diff of the two traces. Keep in mind, the column is the <i>address</i> that the CPU is reading or writing to
+
+<code class=multiline>
 --- bubbl-good.csv  2024-09-08 23:09:03
 +++ bubbl-bad.csv   2024-09-08 23:05:50
 @@ -380774,443697 +380774,305777 @@
@@ -141,13 +177,13 @@ I have some 8-bit assembler knowledge from my time writing a Gameboy emulator. H
 +h0069
  h027A
  h027B
-</code><br>
+</code>
 
-There's a weird counter going on (marked with <code>?</code> above), I'm not sure where this value is coming from, and I doubt the CPU is actually reading it. But it's deterministic so I decided to ignore it (if you know what it is, I would love to hear it!)<br><br>
+There is a weird counter going on (marked with <code>?</code> above), I am not sure where this value is coming from, and I doubt the CPU is actually reading it. But both good and bad traces have it, so I decide to ignore it (if you know what it is, I would love to hear it!)<br><br>
 
 Armed with the following memory map (from MAME) I start decoding the diff:
 
-<code style="display:block; white-space:pre-wrap">
+<code class=multiline>
 0x0000-0x7FFF	32768	ROM	
 0x8000-0xBFFF	16384	ROM Bank	bank1
 0xC000-0xDCFF	7424	RAM, Shared	videoram
@@ -159,11 +195,11 @@ Armed with the following memory map (from MAME) I start decoding the diff:
 0xFA80	        1	    Device Write	watchdog, watchdog_timer_device, reset_w
 0xFB40	        1	    Write	bublbobl_bankswitch_w
 0xFC00-0xFFFF	1024	RAM, Shared	mcu_sharedram
-</code><br>
+</code>
 
 All the addresses belong to the main CPU ROM <code>a78-06</code> so I load the file, that I dumped earlier, onto Ghidra.
 
-<code style="display:block; white-space:pre-wrap">
+<code class=multiline>
  h026C ld de, 0293
  h0064 ?
  h026D <>
@@ -184,76 +220,62 @@ All the addresses belong to the main CPU ROM <code>a78-06</code> so I load the f
 -h0069
 -h0277
 -h0278
- </code><br>
+ </code>
 
 The lines marked as <code><></code> are continuation of the earlier multi-byte instruction.<br><br>
 
-A little bit of assembler knowledge is very helpful here. <code>ld a,b</code> assigns the value of <code>b</code> to <code>a</code>. E.g. <code>ld de, 0293</code> assigns <code>0x0293</code> to the double-width register <code>de</code>. Instructions are decoded into bytes, and are variable length. In the case above <code>ld de, 0293</code> takes three bytes:<br><br>
+The bad and good trace agree until the CPU tries to read bit 7 of 0xFC21:
 
-<code style="display:block; white-space:pre-wrap">
- h026C ; ld de
- h026D ; 02
- h026E ; 93
-</code><br>
+<code class=multiline>
+h026F ld hl, fc21
+h0272 bit 7, (hl)
+h0274 jp nz, 0279
+</code>
 
-In assembler, pointers are denominated by <code>(XX)</code> where <code>XX</code> is a register or an address. E.g.<br><br>
+The <code>jp</code> instruction will jump to <code>0x0279</code> if the bit is <code>nz</code> (non-zero) and will continue if the bit is zero. And from the diff:
 
-<code style="display:block; white-space:pre-wrap">
-h0272 ; bit 7, (hl)
-</code><br>
-
-Checks bit 7 of the value pointed by the register <code>hl</code>. We can see that the value of <code>hl</code> is set just before that:<br><br>
-
-<code style="display:block; white-space:pre-wrap">
-h026F ; ld hl, fc21
-</code><br>
-
-so in whole, the <code>bit 7, (hl)</code> instruction is checking whether bit 7 of <code>0xFC21<c/ode> is zero or one.<br><br>
-
-From the diff above we can see that the CPU in the bad and good board do the same agree until when the CPU tries to read bit 7 of 0xFC21:<br><br>
-
-<code style="display:block; white-space:pre-wrap">
-h0274 ; jp nz, 0279
-</code><br>
-
-This instruction will jump to <code>0x0279</code> if the bit is <code>nz</code> (non-zero) and will continue if the bit is zero. And from the diff:<br><br>
-
-<code style="display:block; white-space:pre-wrap">
+<code class=multiline>
+--- bubbl-good.csv  2024-09-08 23:09:03
++++ bubbl-bad.csv   2024-09-08 23:05:50
+@@ -380774,443697 +380774,305777 @@
+...
 -h0276
 -h0069
 -h0277
 -h0278
  h0279
-</code><br>
+</code>
 
-We can see that the "bad" board does jump to <code>0x0279</code> while the "good" board continues on to <code>0x0276</code>. _This is huge!_ Whatever is at <code>0xFC21</code> is at least part of the problem.<br><br>
+We can see that the "bad" board <i>does</i> jump to <code>0x0279</code> while the "good" board continues on to <code>0x0276</code>. <i>This is huge!</i> Whatever is at <code>0xFC21</code> is at least part of the problem.<br><br>
 
 From the memory map above, <code>0xFC21</code> is part of the MCU Ram at IC16. <br><br>
 
 I check the logic analyzer trace and notice that the read at <code>0x0272</code> is actually the first time the MCRAM is accessed, so the problem might not necessarily be on data pin 7 but it could potentially be all pins, or even the enable pin.<br><br>
 
-I check all the PCB traces coming from the busses to the MCU RAM. I find one other broken trace I missed earlier, board still resets after fixing it.<br><br>
+I check all the PCB traces coming from the buses to the MCU RAM. I find one other broken trace I missed earlier, board still resets after fixing it.<br><br>
 
-I check the pin <code>CD7</code> with my oscilloscope and sure enough, it's always high on the "bad" board, while it fluctuates on the "good" board. After a lot of troubleshooting I notice that, while all other data pins of the RAM are floating most of the time (the voltage is around 1.6V, not a clear "low" or "high"), <code>CD7</code> is always solidly high. A stuck pin!<br><br>
+I check the pin <code>CD7</code> with my oscilloscope and, sure enough, it's always high on the "bad" board, while it changes on the "good" board. After a lot of troubleshooting I notice that, while all other data pins of the RAM are floating most of the time (the voltage is around 1.6V, not a clear "low" or "high"), <code>CD7</code> is always solidly high. A stuck pin!<br><br>
 
-I know the RAM chip itself is good, as I swapped it earlier so I look at all the other chips that might be feeding this line. IC8 seems like a great candidate, it has an output line on <code>CD7</code>, looks very corroded. Unfortunately there's a resistor package too close to the chip to use my logic comparator, so the only option is to desolder it and check it out of circuit.<br><br>
+I know the RAM chip itself is good, as I swapped it earlier, so I look at all the other chips that might be feeding this line. IC8 seems like a great candidate, it has an output line on <code>CD7</code> and looks very corroded. Unfortunately there's a resistor package too close to the chip to use my logic comparator, so the only option is to desolder it and check it out of circuit.
 
 <p align=center>
-<img src="/IMG_2281c.jpeg" width=50% height=50%>
+<img src="/IMG_2281c.jpeg" width=50%>
 </p>
 
-I remove it, add a socket and immediately go to my bench. If IC8 was driving the line high, it should at least do something different now, even without a chip in the socket. _And it does_. The board does not reset anymore, just a black screen. At this point I've been working on this board for weeks during nights and weekends. This is the first tangible improvement I had the entire time. <br><br>
+I remove it, add a socket and immediately go to my bench. If IC8 was driving the line high, it should at least do something different now, even without a chip in the socket. <i>And it does</i>. The board does not reset anymore, just a black screen. At this point I've been working on this board for weeks during nights and weekends. This is the first tangible improvement I had the entire time. <br><br>
 
 I find a new 74LS253 for IC8, put it in the socket and lo and behold, it works! <br><br>
 
-All in all, I replaced and socketed around 10 chips, patched lots of traces and replaced the R connector. Turns out IC8 was the only bad IC. I am happy to report the BK550 is able to tell me that the 74LS253 had a stuck line. <br><br>
+All in all, I replaced and socketed around 10 chips, patched lots of traces and replaced the R connector. Turns out IC8 was the only bad IC. I am happy to report the BK550 is able to tell me that the 74LS253 had a stuck line.
 
 <p align=center>
-<img src="/IMG_2284.jpeg" width=30% height=30%>
+<img src="/IMG_2284.jpeg" width=30%>
 </p>
 
-Next up, the Video board. <br><br>
+Next up, the Video board.
 
 <h3> TL;DR </h3>
 
-Replaced corroded H connector, replaced broken R connector, patched several corroded traces. Watchdog barks. Dumped and verified all ROMs. Replaced several busses ICs with no change. Replaced CPUs and RAMs, no change. With logic analyzer, found out the CPU deviates from a known-good CPU when reading from pin 7 of MCRAM. Traced back to a stuck high pin on IC8. Tested. <br>
+Replaced corroded H connector, replaced broken R connector, patched several corroded traces. Watchdog barks. Dumped and verified all ROMs. Replaced several buses ICs with no change. Replaced CPUs and RAMs, no change. With a logic analyzer, found out the CPU deviates from a known-good CPU when reading from pin 7 of MCRAM. Traced back to a stuck high pin on IC8. Tested. <br>
+</body>
+</html>
