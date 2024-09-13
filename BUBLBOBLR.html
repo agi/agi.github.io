@@ -3,10 +3,11 @@
 <head>
 <style>
 body {
-    padding-left: 10%;
-    padding-right: 10%;
+    margin: 0 auto;
     padding-top: 3em;
     max-width: 40em;
+    align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
 code {
     background: #EEE;
@@ -65,7 +66,7 @@ The board contains no less than 4 micro-processors:
 Each micro-processor has its own address and data bus. This is a rough block diagram of the Main CPU buses: <br><br>
 
 <p align=center>
-<img src="./bubble-bobble-block.png" width=70%>
+<img src="./bubble-bobble-block.png" width=100%>
 </p>
 
 I really struggle reading other people's block diagrams, so if this does not make any sense to you, do not fret, it is not that important.
@@ -85,7 +86,7 @@ The Main CPU data/address buses connect to: the Main ROM, the sub ROM, the Work 
 Additionally, older chips like the 74LS series employed on this board, require a lot of current to drive the state high or low. To make sure that each line is driven adequately, <a href="https://en.wikipedia.org/wiki/Buffer_amplifier">buffers</a> are often put in between the bus and multiple outputs. Occasionally a double-<code>NOT</code> gate is used in place of a buffer, e.g. the 6MHz clock goes through two <code>NOT</code> gates at IC35 before feeding into the main CPU.<br><br>
 
 <p align=center>
-<img src="./double-not-schematich.png" width=30%>
+<img src="./double-not-schematich.png" width=40%>
 </p>
 
 With all of this in mind, a lot of the board is essentially codifying the memory map of each CPU into hardware. Each bus will go through a buffer first, then one or more multiplexer to connect to all the required chips, the enable pins will be driven by the PAL chips and finally connect to the RAM, ROM or hardware input.
@@ -112,10 +113,10 @@ The CPU board keeps resetting, the watchdog barks. The Sub CPU never gets out of
 
 With an oscilloscope, I probe the TRES line of the watchdog, it fires once and then stops firing. <br><br>
 
-With my multimeter in continuity mode I painstakingly probe every bus trace coming out of the CPU to the RAM/ROMs. I patch ~10 broken traces that I find, I start feeling an intense internal dread, <i>I will never find all the broken traces on this board</i>.
+With my multimeter in continuity mode I painstakingly probe every bus trace coming out of the CPU to the RAM/ROMs. I patch ~10 broken traces. I start feeling an intense internal dread, <i>I will never find all the broken traces on this board</i>.
 
 <p align=center>
-<img src="./IMG_2283.jpeg" width=60%>
+<img src="./IMG_2283.jpeg" width=100%>
 </p>
 
 After patching the traces, the board still resets. I pull out my BK Precision 550 Logic comparator and start checking ICs around the buses but everything tests as good. I just got the 550 so I am not sure if the readings are correct or if I am doing something wrong, there are also chips too close to each other that I cannot probe.<br><br>
@@ -124,13 +125,18 @@ I start replacing some of the 74LS245, 157, 138 around the buses, but nothing se
 
 The 60-pin board connector is functional but one of the flaps is broken, so I eventually decide to replace it for the heck of it. This seems to make the reset intervals longer (!) <i>yahoo, something is changing</i>.<br><br>
 
+<p float="left" align="center">
+<img src="/IMG_2210.jpeg" width=40%>
+<img src="/IMG_2214.jpeg" width=40%>
+</p>
+
 At this point I am feeling a little stuck, everything that I probed seems to work correctly, the logic chips seem to be doing what they are supposed to do, all the traces beep, <i>why is this thing not working?</i><br><br>
 
 I get out my 16 channels logic analyzer and record a trace of the main CPU address bus using a DIP clip. I don't have enough channels to know <i>what</i> the CPU is doing, but the addresses can give me a clue of what's going on. I also record a trace of the good board. <i> I might or might not have a 100 channel logic analyzer coming in the mail</i><br><br>
 
 <p float="left" align="center">
-<img src="/IMG_2286.jpeg" width=30%>
-<img src="/IMG_2285.jpeg" width=30%>
+<img src="/IMG_2286.jpeg" width=40%>
+<img src="/IMG_2285.jpeg" width=40%>
 </p>
 
 There is a lot of random noise in the logic analyzer trace, looking closely I notice that the noise seems to mostly be at the sampling frequency so I write a little script to discard any sample of 1/50MHz width, and then compare the good and the bad traces. <i>I'll still have noise, but it will be better</i> I say to myself.<br><br>
@@ -259,7 +265,7 @@ I check the pin <code>CD7</code> with my oscilloscope and, sure enough, it's alw
 I know the RAM chip itself is good, as I swapped it earlier, so I look at all the other chips that might be feeding this line. IC8 seems like a great candidate, it has an output line on <code>CD7</code> and looks very corroded. Unfortunately there's a resistor package too close to the chip to use my logic comparator, so the only option is to desolder it and check it out of circuit.
 
 <p align=center>
-<img src="/IMG_2281c.jpeg" width=50%>
+<img src="/IMG_2281c.jpeg" width=80%>
 </p>
 
 I remove it, add a socket and immediately go to my bench. If IC8 was driving the line high, it should at least do something different now, even without a chip in the socket. <i>And it does</i>. The board does not reset anymore, just a black screen. At this point I've been working on this board for weeks during nights and weekends. This is the first tangible improvement I had the entire time. <br><br>
@@ -269,7 +275,7 @@ I find a new 74LS253 for IC8, put it in the socket and lo and behold, it works! 
 All in all, I replaced and socketed around 10 chips, patched lots of traces and replaced the R connector. Turns out IC8 was the only bad IC. I am happy to report the BK550 is able to tell me that the 74LS253 had a stuck line.
 
 <p align=center>
-<img src="/IMG_2284.jpeg" width=30%>
+<img src="/IMG_2284.jpeg" width=80%>
 </p>
 
 Next up, the Video board.
