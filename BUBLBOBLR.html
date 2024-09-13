@@ -1,4 +1,4 @@
-# A Bubble Bobble repair journey
+<h1> A Bubble Bobble repair journey </h1>
 
 A couple of months ago I picked up a "for parts", original Bubble Bobble board. I've repaired Gameboy carts before and I thought this was gonna be a fun project. 
 
@@ -6,7 +6,7 @@ Going in, I had no prior knowledge of arcade boards, 80s eletronics, TTL, discre
 
 Buckle up, this is gonna be a doozy.
 
-## Background
+<h2> Background </h2>
 
 If you're familiar with Bubble Bobble or arcade boards or electronics in general you can safely skip this section.
 
@@ -37,11 +37,11 @@ Each micro-processor has its own address and data bus. This is a rough block dia
 
 I really struggle reading other people's block diagrams, so if this does not make any sense to you, do not fret, it is not that important.
 
-### Busses
+<h3> Busses </h3>
 
 In basic terms, a bus needs to connect a CPU with multiple chips on the board. The 16-bit address bus of the main CPU is made up of 16 individual traces, each carrying address information for the corresponding bit. Similarly, the 8-bit data bus carries the data information coming in and out of the CPU.
 
-If the CPU wants to read at address `0xFF00` it will set it's address pins `A15..A8` to "high" and the address pins `A7..A0` to "low". The corresponding chip will set the data bus pins `D7..D0` to the value requested. Which chip corresponds to which address (often called "memory map") is encoded _in hardware_, mostly driven by the PAL chips.
+If the CPU wants to read at address <code>0xFF00</code> it will set it's address pins <code>A15..A8</code> to "high" and the address pins <code>A7..A0</code> to "low". The corresponding chip will set the data bus pins <code>D7..D0</code> to the value requested. Which chip corresponds to which address (often called "memory map") is encoded _in hardware_, mostly driven by the PAL chips.
 
 The Main CPU the data/address buses connect to: the Main ROM, the sub ROM, the Work RAM, the MCU Ram, the Watchdog (more on this later), and others. To make sure that only one chip drives the data pins at one time, there are multiple strategies involved:
 * The OE (Output Enable) or CS (Chip Select) pins of unrelated chips are disabled
@@ -51,13 +51,13 @@ Additionally, older chips, like the 74LS series, require a lot of current to dri
 
 With all of this in mind, a lot of the board is essentially codifying the memory map of each CPU into hardware. Each bus will go through a buffer first, then one or more multiplexer to connect to all the required chips, the enable pins will be driven by the PAL chips and finally connect to the RAM, ROM or hardware input.
 
-### Watchdog
+<h3> Watchdog </h3>
 
 A hardware watchdog is a system that ensures that the system continues to operate normally. At its basic terms, a watchdog is a timer, which, if not restarted, will reset the system. The CPU is in charge of periodically restarting the watchdog. If the system does not restart, we are guaranteed that the CPU is still running somewhat normally.
 
-The Bubble bobble watchdog is implemented by a 74LS393 counter at IC31. The counter increments at every VBLANK (Vertical Blank, a signal that is pulled low whenever a new frame is drawn). The CPU can restart the Watchdog timer by writing to address `0xFF80`. This address is encoded into the PAL at IC49 which pulls the `TRES` (Timer RESet?) line through the multiplexer at IC39. If IC31 timer is not restarted, the `1DQ` line of IC31 will be eventually pulled high, triggering the master `RESET` line which restarts every chip on the board including the main CPU.
+The Bubble bobble watchdog is implemented by a 74LS393 counter at IC31. The counter increments at every VBLANK (Vertical Blank, a signal that is pulled low whenever a new frame is drawn). The CPU can restart the Watchdog timer by writing to address <code>0xFF80</code>. This address is encoded into the PAL at IC49 which pulls the <code>TRES</code> (Timer RESet?) line through the multiplexer at IC39. If IC31 timer is not restarted, the <code>1DQ</code> line of IC31 will be eventually pulled high, triggering the master <code>RESET</code> line which restarts every chip on the board including the main CPU.
 
-### Repair log
+<h3> Repair log </h3>
 
 When I first got the board I immediately realized that I was in for a long journey. The board had extensive corrosion, lots of deep scratches and what looked like corroded traces.
 
@@ -100,7 +100,7 @@ Looking for a disassembler people online reccomends NSA's Ghidra, which I know o
 
 I have some 8-bit assembler knowledge from my time writing a Gameboy emulator. Here's a snippet the diff of the two traces, keep in mind, the column is the _address_ that the CPU is reading or writing to
 
-```
+<code style="display:block; white-space:pre-wrap">
 --- bubbl-good.csv  2024-09-08 23:09:03
 +++ bubbl-bad.csv   2024-09-08 23:05:50
 @@ -380774,443697 +380774,305777 @@
@@ -134,13 +134,13 @@ I have some 8-bit assembler knowledge from my time writing a Gameboy emulator. H
 +h0069
  h027A
  h027B
-```
+</code>
 
-There's a weird counter going on (marked with `?` above), I'm not sure where this value is coming from, and I doubt the CPU is actually reading it. But it's deterministic so I decided to ignore it (if you know what it is, I would love to hear it!)
+There's a weird counter going on (marked with <code>?</code> above), I'm not sure where this value is coming from, and I doubt the CPU is actually reading it. But it's deterministic so I decided to ignore it (if you know what it is, I would love to hear it!)
 
 Armed with the following memory map (from MAME) I start decoding the diff:
 
-```
+<code style="display:block; white-space:pre-wrap">
 0x0000-0x7FFF	32768	ROM	
 0x8000-0xBFFF	16384	ROM Bank	bank1
 0xC000-0xDCFF	7424	RAM, Shared	videoram
@@ -152,11 +152,11 @@ Armed with the following memory map (from MAME) I start decoding the diff:
 0xFA80	        1	    Device Write	watchdog, watchdog_timer_device, reset_w
 0xFB40	        1	    Write	bublbobl_bankswitch_w
 0xFC00-0xFFFF	1024	RAM, Shared	mcu_sharedram
-```
+</code>
 
-All the addresses belong to the main CPU ROM `a78-06` so I load the file, that I dumped earlier, onto Ghidra.
+All the addresses belong to the main CPU ROM <code>a78-06</code> so I load the file, that I dumped earlier, onto Ghidra.
 
-```
+<code style="display:block; white-space:pre-wrap">
  h026C ld de, 0293
  h0064 ?
  h026D <>
@@ -177,59 +177,59 @@ All the addresses belong to the main CPU ROM `a78-06` so I load the file, that I
 -h0069
 -h0277
 -h0278
-```
+ </code>
 
-The lines marked as `<>` are continuation of the earlier multi-byte instruction.
+The lines marked as <code><></code> are continuation of the earlier multi-byte instruction.
 
-A little bit of assembler knowledge is very helpful here. `ld a,b` assigns the value of `b` to `a`. E.g. `ld de, 0293` assigns `0x0293` to the double-width register `de`. Instructions are decoded into bytes, and are variable length. In the case above `ld de, 0293` takes three bytes:
+A little bit of assembler knowledge is very helpful here. <code>ld a,b</code> assigns the value of <code>b</code> to <code>a</code>. E.g. <code>ld de, 0293</code> assigns <code>0x0293</code> to the double-width register <code>de</code>. Instructions are decoded into bytes, and are variable length. In the case above <code>ld de, 0293</code> takes three bytes:
 
-```
+<code style="display:block; white-space:pre-wrap">
  h026C ; ld de
  h026D ; 02
  h026E ; 93
-```
+</code>
 
-In assembler, pointers are denominated by `(XX)` where `XX` is a register or an address. E.g.
+In assembler, pointers are denominated by <code>(XX)</code> where <code>XX</code> is a register or an address. E.g.
 
-```
+<code style="display:block; white-space:pre-wrap">
 h0272 ; bit 7, (hl)
-```
+</code>
 
-Checks bit 7 of the value pointed by the register `hl`. We can see that the value of `hl` is set just before that:
+Checks bit 7 of the value pointed by the register <code>hl</code>. We can see that the value of <code>hl</code> is set just before that:
 
-```
+<code style="display:block; white-space:pre-wrap">
 h026F ; ld hl, fc21
-```
+</code>
 
-so in whole, the `bit 7, (hl)` instruction is checking whether bit 7 of `0xFC21` is zero or one.
+so in whole, the <code>bit 7, (hl)</code> instruction is checking whether bit 7 of <code>0xFC21<c/ode> is zero or one.
 
 From the diff above we can see that the CPU in the bad and good board do the same agree until when the CPU tries to read bit 7 of 0xFC21:
 
-```
+<code style="display:block; white-space:pre-wrap">
 h0274 ; jp nz, 0279
-```
+</code>
 
-This instruction will jump to `0x0279` if the bit is `nz` (non-zero) and will continue if the bit is zero. And from the diff:
+This instruction will jump to <code>0x0279</code> if the bit is <code>nz</code> (non-zero) and will continue if the bit is zero. And from the diff:
 
-```
+<code style="display:block; white-space:pre-wrap">
 -h0276
 -h0069
 -h0277
 -h0278
  h0279
-```
+</code>
 
-We can see that the "bad" board does jump to `0x0279` while the "good" board continues on to `0x0276`. _This is huge!_ Whatever is at `0xFC21` is at least part of the problem.
+We can see that the "bad" board does jump to <code>0x0279</code> while the "good" board continues on to <code>0x0276</code>. _This is huge!_ Whatever is at <code>0xFC21</code> is at least part of the problem.
 
-From the memory map above, `0xFC21` is part of the MCU Ram at IC16. 
+From the memory map above, <code>0xFC21</code> is part of the MCU Ram at IC16. 
 
-I check the logic analyzer trace and notice that the read at `0x0272` is actually the first time the MCRAM is accessed, so the problem might not necessarily be on data pin 7 but it could potentially be all pins, or even the enable pin.
+I check the logic analyzer trace and notice that the read at <code>0x0272</code> is actually the first time the MCRAM is accessed, so the problem might not necessarily be on data pin 7 but it could potentially be all pins, or even the enable pin.
 
 I check all the PCB traces coming from the busses to the MCU RAM. I find one other broken trace I missed earlier, board still resets after fixing it.
 
-I check the pin `CD7` with my oscilloscope and sure enough, it's always high on the "bad" board, while it fluctuates on the "good" board. After a lot of troubleshooting I notice that, while all other data pins of the RAM are floating most of the time (the voltage is around 1.6V, not a clear "low" or "high"), `CD7` is always solidly high. A stuck pin!
+I check the pin <code>CD7</code> with my oscilloscope and sure enough, it's always high on the "bad" board, while it fluctuates on the "good" board. After a lot of troubleshooting I notice that, while all other data pins of the RAM are floating most of the time (the voltage is around 1.6V, not a clear "low" or "high"), <code>CD7</code> is always solidly high. A stuck pin!
 
-I know the RAM chip itself is good, as I swapped it earlier so I look at all the other chips that might be feeding this line. IC8 seems like a great candidate, it has an output line on `CD7`, looks very corroded. Unfortunately there's a resistor package too close to the chip to use my logic comparator, so the only option is to desolder it and check it out of circuit.
+I know the RAM chip itself is good, as I swapped it earlier so I look at all the other chips that might be feeding this line. IC8 seems like a great candidate, it has an output line on <code>CD7</code>, looks very corroded. Unfortunately there's a resistor package too close to the chip to use my logic comparator, so the only option is to desolder it and check it out of circuit.
 
 <p align=center>
 <img src="/IMG_2281c.jpeg" width=50% height=50%>
